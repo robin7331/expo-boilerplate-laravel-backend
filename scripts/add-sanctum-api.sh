@@ -29,6 +29,15 @@ cp templates/sanctum-api/app/Http/Controllers/Api/V1/AuthController.php \
 echo "Adding API routes..."
 cp templates/sanctum-api/routes/api.php routes/api.php
 
+# ── Add HasApiTokens trait to User model ─────────────────────────────────────
+
+USER_MODEL="app/Models/User.php"
+if ! grep -q "HasApiTokens" "$USER_MODEL"; then
+  echo "Adding HasApiTokens trait to User model..."
+  perl -i -pe 's/^(use Illuminate\\Foundation\\Auth\\User as Authenticatable;)/$1\nuse Laravel\\Sanctum\\HasApiTokens;/' "$USER_MODEL"
+  perl -i -pe 's/(use HasFactory, Notifiable)/use HasApiTokens, HasFactory, Notifiable/' "$USER_MODEL"
+fi
+
 # ── Add access gate for Pulse/Telescope ──────────────────────────────────────
 
 # Only add the gate if it doesn't already exist
@@ -71,6 +80,29 @@ php artisan migrate:fresh --seed --no-interaction
 
 echo "Running Pint..."
 vendor/bin/pint --quiet 2>/dev/null || true
+
+# ── Validate ─────────────────────────────────────────────────────────────────
+
+echo "Validating Sanctum setup..."
+VALID=true
+
+if ! grep -q "HasApiTokens" "$USER_MODEL"; then
+  echo "  ✗ HasApiTokens trait missing from User model"
+  VALID=false
+fi
+
+if ! php artisan route:list --path=api/v1/auth/login --json 2>/dev/null | grep -q "login"; then
+  echo "  ✗ Login route not registered"
+  VALID=false
+fi
+
+if [ "$VALID" = false ]; then
+  echo ""
+  echo "ERROR: Sanctum validation failed. Check the errors above."
+  exit 1
+fi
+
+echo "  ✓ All checks passed"
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 
