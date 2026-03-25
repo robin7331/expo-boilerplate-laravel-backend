@@ -94,19 +94,17 @@ if [ -f "$SIDEBAR" ]; then
   fi
 
   # Add nav items to footerNavItems array
-  # Build the items to insert before the Repository link
-  ITEMS=""
+  # Insert Pulse and Telescope items before the Repository link using perl
+  # (macOS sed doesn't handle multi-line inserts reliably)
   if $PULSE && ! grep -q "'Pulse'" "$SIDEBAR"; then
-    ITEMS="$ITEMS    {\n        title: 'Pulse',\n        href: '/pulse',\n        icon: Activity,\n    },\n"
+    perl -i -0pe "s/(const footerNavItems: NavItem\[\] = \[\n)/\$1    {\n        title: 'Pulse',\n        href: '\/pulse',\n        icon: Activity,\n    },\n/" "$SIDEBAR"
   fi
   if $TELESCOPE && ! grep -q "'Telescope'" "$SIDEBAR"; then
-    ITEMS="$ITEMS    {\n        title: 'Telescope',\n        href: '/telescope',\n        icon: TelescopeIcon,\n    },\n"
-  fi
-
-  if [ -n "$ITEMS" ]; then
-    # Insert before the Repository item
-    sed -i '' "/title: 'Repository'/i\\
-${ITEMS}" "$SIDEBAR" 2>/dev/null || true
+    perl -i -0pe "s/(title: 'Pulse',\n    },\n)/\$1    {\n        title: 'Telescope',\n        href: '\/telescope',\n        icon: TelescopeIcon,\n    },\n/" "$SIDEBAR"
+    # Fallback if Pulse wasn't added (Telescope-only)
+    if ! grep -q "'Telescope'" "$SIDEBAR"; then
+      perl -i -0pe "s/(const footerNavItems: NavItem\[\] = \[\n)/\$1    {\n        title: 'Telescope',\n        href: '\/telescope',\n        icon: TelescopeIcon,\n    },\n/" "$SIDEBAR"
+    fi
   fi
 fi
 
